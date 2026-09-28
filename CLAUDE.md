@@ -16,7 +16,7 @@
   단지별로 호가와 실거래가를 겹친 그래프를 보여준다.
 - **휴대폰에서 보기**: GitHub Pages를 추천했다(링크를 아는 사람은 볼 수 있음).
   비밀번호 보호가 필요하면 Cloudflare Pages 등을 검토한다. 사용자의 GitHub 계정 여부는 아직 모른다.
-- **주기 실행**: Windows 작업 스케줄러를 쓴다(새 PC가 Windows일 경우).
+- **주기 실행**: 맥 launchd — 켜질 때(로그인) + 8시·20시. 6시간 이내 재수집은 건너뜀.
 
 ## 아직 받지 못한 정보
 - 추적할 **단지 목록과 평형 조건**. 기존 config.json의 12개 단지와 공급 23~28평에서 바꾸기로 했다.
@@ -32,15 +32,15 @@
 - 평형: 사용자 요청 "59~84타입" → 전용 58~86㎡. 대시보드는 타입(59/73/79/84)별 버튼으로 나눠 보여 줌.
 - 2026-09-28 16:22 첫 호가 수집 성공(12곳 전부). 실거래는 인증키가 아직 없어 미수집.
 - 켤 때마다 실행되므로 호가·실거래 모두 직전 수집 후 6시간(min_interval_hours) 이내면 건너뜀(--force로 무시).
-- launchd 에이전트(`~/Library/LaunchAgents/com.apt.dashboard.plist`, RunAtLoad + 8시·20시)를 만들었으나
-  **~/Documents 접근이 macOS 권한(TCC)에 막혀 실패** → bootout 해 둠. 프로젝트를 Documents 밖으로 옮길지 사용자 결정 대기.
+- 프로젝트 위치를 **/Users/Shared/APT Project** 로 옮김(~/Documents 는 macOS 권한 때문에 launchd 실행 불가).
+  .venv 재생성. launchd 에이전트(`~/Library/LaunchAgents/com.apt.dashboard.plist`, 로그인 시 + 8시·20시) 등록·동작 확인.
+  실행 출력은 /tmp/apt-dashboard.{out,err}, 로그는 logs/run.log.
 - 로컬 git 저장소 생성, 첫 커밋 완료(아직 GitHub 원격 없음, push 안 함).
 
 ## 다음 단계
-1. 프로젝트 폴더를 Documents 밖(예: ~/apt-dashboard)으로 옮길지 결정 → plist 경로 수정 후 launchd 등록
-2. 공공데이터포털 인증키 발급 → secrets.json → `collect_trades.py --find 11230 이문` 등으로 실거래 단지명 매칭 확인
+1. 공공데이터포털 인증키 발급 → secrets.json → `collect_trades.py --find 11230 이문` 등으로 실거래 단지명 매칭 확인
    (네이버 이름과 다를 가능성 높음: 이문e-편한세상, 길음래미안1차 등 → molit_name 채우기)
-3. GitHub에 public 저장소 생성 → remote 추가·push → Pages(/docs) 켜기 → config `publish_git: true`
+2. GitHub에 public 저장소 생성 → remote 추가·push → Pages(/docs) 켜기 → config `publish_git: true`
 
 ## 파일
 - `run.py`: 전체 실행 진입점 / `common.py`: 설정·DB 스키마

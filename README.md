@@ -18,7 +18,7 @@ SQLite(`data/apt.db`)에 쌓고, 휴대폰으로 보는 정적 대시보드(`doc
 
 ```bash
 xcode-select --install          # python3, git 설치 (창이 뜨면 '설치')
-cd "~/Documents/APT Project"
+cd "/Users/Shared/APT Project"
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
@@ -70,8 +70,9 @@ open docs/index.html
 <plist version="1.0"><dict>
   <key>Label</key><string>com.apt.dashboard</string>
   <key>ProgramArguments</key><array>
-    <string>/Users/skb2930/Documents/APT Project/.venv/bin/python</string>
-    <string>/Users/skb2930/Documents/APT Project/run.py</string>
+    <string>/Users/Shared/APT Project/.venv/bin/python</string>
+    <string>-W</string><string>ignore</string>
+    <string>/Users/Shared/APT Project/run.py</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>StartCalendarInterval</key><array>
