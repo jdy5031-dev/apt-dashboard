@@ -10,17 +10,17 @@
   "trade_refresh_months": 3,
   "publish_git": false,
   "complexes": [
-    { "name": "래미안아트리치", "complex_no": "114972", "lawd_cd": "11290", "molit_name": "", "umd_nm": "석관동" },
-    { "name": "이문 e편한세상", "complex_no": "8199", "lawd_cd": "11230", "molit_name": "", "umd_nm": "이문동" },
-    { "name": "길음래미안1단지", "complex_no": "3422", "lawd_cd": "11290", "molit_name": "", "umd_nm": "길음동" },
-    { "name": "휘경 SK뷰", "complex_no": "112482", "lawd_cd": "11230", "molit_name": "", "umd_nm": "휘경동" },
-    { "name": "래미안라그란데", "complex_no": "163360", "lawd_cd": "11230", "molit_name": "", "umd_nm": "이문동" },
-    { "name": "이문대우", "complex_no": "3374", "lawd_cd": "11230", "molit_name": "", "umd_nm": "이문동" },
-    { "name": "휘경자이디센시아", "complex_no": "157123", "lawd_cd": "11230", "molit_name": "", "umd_nm": "휘경동" },
-    { "name": "청계한신휴플러스", "complex_no": "100405", "lawd_cd": "11230", "molit_name": "", "umd_nm": "답십리동" },
-    { "name": "힐스테이트청계", "complex_no": "110935", "lawd_cd": "11230", "molit_name": "", "umd_nm": "답십리동" },
-    { "name": "래미안위브", "complex_no": "104202", "lawd_cd": "11230", "molit_name": "", "umd_nm": "답십리동" },
-    { "name": "래미안크레시티", "complex_no": "103797", "lawd_cd": "11230", "molit_name": "", "umd_nm": "전농동" },
-    { "name": "전농SK", "complex_no": "3276", "lawd_cd": "11230", "molit_name": "", "umd_nm": "전농동" }
+    { "name": "래미안아트리치", "complex_no": "114972", "lawd_cd": "11290", "molit_name": "", "molit_apt_seq": "11290-4788", "umd_nm": "석관동" },
+    { "name": "이문 e편한세상", "complex_no": "8199", "lawd_cd": "11230", "molit_name": "대림e-편한세상", "molit_apt_seq": "11230-65", "umd_nm": "이문동" },
+    { "name": "길음래미안1단지", "complex_no": "3422", "lawd_cd": "11290", "molit_name": "길음뉴타운1단지(래미안길음1차)", "molit_apt_seq": "11290-60", "umd_nm": "길음동" },
+    { "name": "휘경 SK뷰", "complex_no": "112482", "lawd_cd": "11230", "molit_name": "휘경SK뷰", "molit_apt_seq": "11230-2908", "umd_nm": "휘경동" },
+    { "name": "래미안라그란데", "complex_no": "163360", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-3384", "umd_nm": "이문동" },
+    { "name": "이문대우", "complex_no": "3374", "lawd_cd": "11230", "molit_name": "대우", "molit_apt_seq": "11230-59", "umd_nm": "이문동" },
+    { "name": "휘경자이디센시아", "complex_no": "157123", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-4340", "umd_nm": "휘경동" },
+    { "name": "청계한신휴플러스", "complex_no": "100405", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-2208", "umd_nm": "답십리동" },
+    { "name": "힐스테이트청계", "complex_no": "110935", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-2823", "umd_nm": "답십리동" },
+    { "name": "래미안위브", "complex_no": "104202", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-2587", "umd_nm": "답십리동" },
+    { "name": "래미안크레시티", "complex_no": "103797", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-2578", "umd_nm": "전농동" },
+    { "name": "전농SK", "complex_no": "3276", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-10", "umd_nm": "전농동" }
   ]
 }

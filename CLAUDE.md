@@ -37,10 +37,12 @@
   실행 출력은 /tmp/apt-dashboard.{out,err}, 로그는 logs/run.log.
 - 로컬 git 저장소 생성, 첫 커밋 완료(아직 GitHub 원격 없음, push 안 함).
 
+- (네 번째 세션) 인증키 설정 완료. 12곳 모두 국토부 단지 매칭 → config에 `molit_apt_seq`(aptSeq)로 고정.
+  이름이 다른 곳: 이문 e편한세상=대림e-편한세상, 길음래미안1단지=길음뉴타운1단지(래미안길음1차), 이문대우=대우, 휘경 SK뷰=휘경SK뷰.
+  36개월 백필 완료(2,129건). 래미안라그란데(13건)·휘경자이디센시아(2건)는 신축이라 거래가 적음(분양권 거래는 이 API에 없음).
+
 ## 다음 단계
-1. 공공데이터포털 인증키 발급 → secrets.json → `collect_trades.py --find 11230 이문` 등으로 실거래 단지명 매칭 확인
-   (네이버 이름과 다를 가능성 높음: 이문e-편한세상, 길음래미안1차 등 → molit_name 채우기)
-2. GitHub에 public 저장소 생성 → remote 추가·push → Pages(/docs) 켜기 → config `publish_git: true`
+1. GitHub에 public 저장소 생성 → remote 추가·push → Pages(/docs) 켜기 → config `publish_git: true`
 
 ## 파일
 - `run.py`: 전체 실행 진입점 / `common.py`: 설정·DB 스키마
