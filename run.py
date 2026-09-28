@@ -6,6 +6,7 @@
 """
 
 import argparse
+import os
 import subprocess
 import sys
 
@@ -22,7 +23,9 @@ log = setup_logging("run")
 def publish():
     """docs/index.html 이 바뀌었으면 커밋해서 push 한다(GitHub Pages 용)."""
     def git(*args):
-        return subprocess.run(["git", *args], cwd=BASE_DIR, capture_output=True, text=True)
+        # launchd 에는 터미널이 없으므로 인증 프롬프트를 띄우지 말고 바로 실패하게 한다
+        env = dict(os.environ, GIT_TERMINAL_PROMPT="0")
+        return subprocess.run(["git", *args], cwd=BASE_DIR, capture_output=True, text=True, env=env, timeout=120)
 
     git("add", "docs/index.html")
     if git("diff", "--cached", "--quiet").returncode == 0:

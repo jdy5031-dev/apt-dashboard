@@ -40,9 +40,11 @@
 - (네 번째 세션) 인증키 설정 완료. 12곳 모두 국토부 단지 매칭 → config에 `molit_apt_seq`(aptSeq)로 고정.
   이름이 다른 곳: 이문 e편한세상=대림e-편한세상, 길음래미안1단지=길음뉴타운1단지(래미안길음1차), 이문대우=대우, 휘경 SK뷰=휘경SK뷰.
   36개월 백필 완료(2,129건). 래미안라그란데(13건)·휘경자이디센시아(2건)는 신축이라 거래가 적음(분양권 거래는 이 API에 없음).
+- GitHub 원격 `jdy5031-dev/apt-dashboard`(public) 연결·push 완료. `publish_git: true` — 수집 후 docs/index.html 바뀌면 자동 커밋·push.
+  인증은 맥 키체인(osxkeychain)에 저장된 자격 증명을 씀.
 
 ## 다음 단계
-1. GitHub에 public 저장소 생성 → remote 추가·push → Pages(/docs) 켜기 → config `publish_git: true`
+1. GitHub Pages 켜기(저장소 Settings → Pages → main 브랜치 /docs) → 휴대폰에서 https://jdy5031-dev.github.io/apt-dashboard/ 확인
 
 ## 파일
 - `run.py`: 전체 실행 진입점 / `common.py`: 설정·DB 스키마

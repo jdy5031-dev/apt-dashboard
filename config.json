@@ -8,7 +8,7 @@
   "min_interval_hours": 6,
   "trade_backfill_months": 36,
   "trade_refresh_months": 3,
-  "publish_git": false,
+  "publish_git": true,
   "complexes": [
     { "name": "래미안아트리치", "complex_no": "114972", "lawd_cd": "11290", "molit_name": "", "molit_apt_seq": "11290-4788", "umd_nm": "석관동" },
     { "name": "이문 e편한세상", "complex_no": "8199", "lawd_cd": "11230", "molit_name": "대림e-편한세상", "molit_apt_seq": "11230-65", "umd_nm": "이문동" },
