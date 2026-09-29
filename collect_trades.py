@@ -68,7 +68,11 @@ def fetch_month(key: str, lawd_cd: str, deal_ymd: str) -> list:
     while True:
         params = {"serviceKey": key, "LAWD_CD": lawd_cd, "DEAL_YMD": deal_ymd,
                   "pageNo": page, "numOfRows": ROWS_PER_PAGE}
-        resp = requests.get(API_URL, params=params, timeout=20)
+        try:
+            resp = requests.get(API_URL, params=params, timeout=20)
+        except requests.RequestException as e:
+            # 예외 메시지에 인증키가 든 URL이 통째로 들어가므로 종류만 남긴다
+            raise ApiError(f"네트워크 오류 ({lawd_cd}/{deal_ymd}): {type(e).__name__}") from None
         if resp.status_code != 200:
             raise ApiError(f"HTTP {resp.status_code} ({lawd_cd}/{deal_ymd}): {resp.text[:200]}")
         try:

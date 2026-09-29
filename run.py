@@ -7,8 +7,10 @@
 
 import argparse
 import os
+import socket
 import subprocess
 import sys
+import time
 
 import requests
 
@@ -40,6 +42,19 @@ def publish():
         log.info("게시 완료")
 
 
+def wait_for_network(timeout_sec: int = 180) -> bool:
+    """맥을 켠 직후에는 인터넷 연결 전에 실행되기도 하므로, 연결될 때까지 잠깐 기다린다."""
+    deadline = time.time() + timeout_sec
+    while True:
+        try:
+            socket.getaddrinfo("fin.land.naver.com", 443)
+            return True
+        except OSError:
+            if time.time() >= deadline:
+                return False
+            time.sleep(10)
+
+
 def main():
     p = argparse.ArgumentParser(description="수집 + 대시보드 생성")
     p.add_argument("--skip-listings", action="store_true", help="네이버 호가 수집 생략")
@@ -47,6 +62,9 @@ def main():
     p.add_argument("--no-publish", action="store_true", help="GitHub 게시 생략")
     args = p.parse_args()
     ok = True
+    if not wait_for_network():
+        log.error("인터넷에 연결되지 않아 이번 회차를 건너뜀")
+        sys.exit(1)
 
     if not args.skip_listings:
         try:
