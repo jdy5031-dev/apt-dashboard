@@ -48,7 +48,7 @@
 
 ## 파일
 - `run.py`: 전체 실행 진입점 / `common.py`: 설정·DB 스키마
-- `collect_listings.py`: 네이버 호가(fin.land API) → listing_snapshot, listing_article
+- `collect_listings.py`: 네이버 호가(fin.land API) → listing_snapshot, listing_article / 단지 정보(`/complex`: 사용승인일·세대수·용적률·건폐율) → complex_info (30일마다, `--info`로 즉시)
 - `collect_trades.py`: 국토부 실거래 → trade (시군구×월 단위, trade_fetch_log로 과거 달 재호출 방지)
 - `build_dashboard.py`: docs/index.html 생성 (Chart.js CDN, 데이터 인라인, 타입·기간 선택)
 - `config.json`, `secrets.json.example`, `.gitignore`, `README.md`

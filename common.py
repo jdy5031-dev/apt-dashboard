@@ -36,6 +36,17 @@ CREATE TABLE IF NOT EXISTS listing_article (
     PRIMARY KEY (snapshot_id, article_no)
 );
 
+-- 네이버 단지 기본 정보. 거의 바뀌지 않으므로 info_refresh_days 마다 갱신한다.
+CREATE TABLE IF NOT EXISTS complex_info (
+    complex             TEXT PRIMARY KEY,   -- config.json 의 단지 name
+    use_approval_date   TEXT,               -- 사용승인일 'YYYYMMDD'
+    households          INTEGER,            -- 총 세대수
+    floor_area_ratio    INTEGER,            -- 용적률 %
+    building_cov_ratio  INTEGER,            -- 건폐율 %
+    raw_json            TEXT,               -- 원본 응답(동 수·시공사·주차 등 나중에 쓸 수 있게)
+    fetched_at          TEXT NOT NULL
+);
+
 -- 국토부 실거래. 거래 고유번호가 없어서 (단지, 계약일, 면적, 층, 동, 금액)을 키로 쓴다.
 CREATE TABLE IF NOT EXISTS trade (
     complex      TEXT NOT NULL,

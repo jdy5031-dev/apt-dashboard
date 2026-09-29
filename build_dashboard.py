@@ -66,6 +66,18 @@ def trade_series(conn, name: str, lo: float, hi: float) -> dict:
     return out
 
 
+def complex_info(conn, name: str) -> dict:
+    """{approval: 'YYYY-MM[-DD]', households, far, bcr} — 아직 없으면 빈 dict.
+    신축은 사용승인일이 'YYYYMM' 까지만 오기도 하고, 용적률·건폐율이 0(미등록)으로 오기도 한다."""
+    r = conn.execute("SELECT * FROM complex_info WHERE complex = ?", (name,)).fetchone()
+    if not r:
+        return {}
+    d = r["use_approval_date"] or ""
+    approval = "-".join(p for p in (d[:4], d[4:6], d[6:8]) if p) if len(d) >= 6 else None
+    return {"approval": approval, "households": r["households"] or None,
+            "far": r["floor_area_ratio"] or None, "bcr": r["building_cov_ratio"] or None}
+
+
 def build() -> str:
     config = load_config()
     conn = connect()
@@ -76,7 +88,7 @@ def build() -> str:
         trades = trade_series(conn, c["name"], lo, hi)
         types = {t: {"asking": asking.get(t, []), "trades": trades.get(t, [])}
                  for t in sorted(set(asking) | set(trades), key=int)}
-        complexes.append({"name": c["name"], "types": types})
+        complexes.append({"name": c["name"], "info": complex_info(conn, c["name"]), "types": types})
     conn.close()
 
     updated = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -151,6 +163,13 @@ header p { margin: 0; color: var(--text-muted); font-size: 13px; }
 .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 10px; margin-top: 14px; }
 .card h2 { font-size: 17px; margin: 0; }
 .card .sub { color: var(--text-muted); font-size: 12px; margin: 2px 0 10px; }
+.info { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 0 12px; padding: 8px 0;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.info div { min-width: 0; }
+.info dt { color: var(--text-muted); font-size: 11px; }
+.info dd { margin: 0; font-size: 14px; font-weight: 500; }
+.info dd small { color: var(--text-muted); font-weight: 400; font-size: 11px; }
+@media (max-width: 380px) { .info { grid-template-columns: repeat(2, 1fr); } }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
 .stat { min-width: 0; }
 .stat .label { color: var(--text-muted); font-size: 12px; }
@@ -239,6 +258,20 @@ function renderSummary() {
     `<thead><tr><th>단지</th><th>매물</th><th>최저 호가</th><th>최근 실거래</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
+// 사용승인일·세대수·용적률·건폐율. 연차는 올해 − 사용승인 연도(네이버 approvalElapsedYear 와 같음).
+function infoRow(info) {
+  if (!info || !Object.keys(info).length) return "";
+  const n = v => v == null ? "-" : v.toLocaleString();
+  const ap = info.approval;
+  const age = ap ? new Date().getFullYear() - Number(ap.slice(0, 4)) : null;
+  return `<dl class="info">
+    <div><dt>사용승인</dt><dd>${ap ? ap.slice(0, 7).replace("-", ".") : "-"}${age != null ? ` <small>${age}년</small>` : ""}</dd></div>
+    <div><dt>세대수</dt><dd>${n(info.households)}</dd></div>
+    <div><dt>용적률</dt><dd>${info.far == null ? "-" : info.far + "%"}</dd></div>
+    <div><dt>건폐율</dt><dd>${info.bcr == null ? "-" : info.bcr + "%"}</dd></div>
+  </dl>`;
+}
+
 function renderCards() {
   const root = document.getElementById("cards");
   if (!DATA.complexes.length || !groups.length) {
@@ -255,6 +288,7 @@ function renderCards() {
     return `<section class="card" id="c${i}">
       <h2>${esc(c.name)}</h2>
       <div class="sub">전용 ${types.join(", ")}㎡</div>
+      ${infoRow(c.info)}
       <div class="stats">
         <div class="stat"><div class="label">매물 수</div><div class="value">${a ? a[1] + "건" : "-"}</div>
           <div class="note">${a ? a[0] : ""}</div></div>

@@ -64,6 +64,38 @@ def post(session, path: str, body: dict) -> dict:
         return data["result"]
 
 
+def update_complex_info(session, conn, complexes: list, refresh_days: int, delay: float, force: bool = False):
+    """사용승인일·세대수·용적률·건폐율. 저장된 지 refresh_days 가 안 지났으면 건너뛴다."""
+    fetched = {r["complex"]: r["fetched_at"] for r in conn.execute("SELECT complex, fetched_at FROM complex_info")}
+    now = datetime.now()
+    for c in complexes:
+        name, complex_no = c.get("name", "?"), str(c.get("complex_no", ""))
+        if not complex_no or complex_no == "REPLACE_ME":
+            continue
+        last = fetched.get(name)
+        if last and not force and (now - datetime.strptime(last, "%Y-%m-%d %H:%M:%S")).days < refresh_days:
+            continue
+        resp = session.get(API + "/complex", params={"complexNumber": complex_no}, timeout=15)
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {}
+        if resp.status_code != 200 or not data.get("isSuccess"):
+            log.error("단지 정보 조회 실패: %s (HTTP %d)", name, resp.status_code)
+            continue
+        r = data["result"]
+        ratio = r.get("buildingRatioInfo") or {}
+        conn.execute(
+            "INSERT OR REPLACE INTO complex_info VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (name, r.get("useApprovalDate"), r.get("totalHouseholdNumber"), ratio.get("floorAreaRatio"),
+             ratio.get("buildingCoverageRatio"), json.dumps(r, ensure_ascii=False), now.strftime("%Y-%m-%d %H:%M:%S")),
+        )
+        conn.commit()
+        log.info("단지 정보: %s 사용승인 %s, %s세대, 용적률 %s%%, 건폐율 %s%%", name, r.get("useApprovalDate"),
+                 r.get("totalHouseholdNumber"), ratio.get("floorAreaRatio"), ratio.get("buildingCoverageRatio"))
+        time.sleep(delay + random.uniform(0, 1))
+
+
 def fetch_articles(session, complex_no: str, trade_type: str, delay: float, max_pages: int, debug: bool) -> list:
     """단지 매물 목록 전체(묶인 매물은 대표 매물 한 건)."""
     items, last_info, seed = [], [], None
@@ -139,6 +171,8 @@ def run(dry_run: bool = False, debug: bool = False, force: bool = False) -> int:
             return 0
     session = new_session()
     done = 0
+    if conn:
+        update_complex_info(session, conn, config.get("complexes", []), config.get("info_refresh_days", 30), delay)
 
     for c in config.get("complexes", []):
         name, complex_no = c.get("name", "?"), str(c.get("complex_no", ""))
@@ -173,5 +207,12 @@ if __name__ == "__main__":
     p.add_argument("--dry-run", action="store_true", help="DB에 저장하지 않고 콘솔에만 출력")
     p.add_argument("--debug", action="store_true", help="첫 페이지 원본 응답을 logs/debug_*.json 으로 저장")
     p.add_argument("--force", action="store_true", help="최근에 수집했어도 다시 수집")
+    p.add_argument("--info", action="store_true", help="단지 정보(사용승인일·세대수·용적률·건폐율)만 지금 다시 받기")
     args = p.parse_args()
-    run(args.dry_run, args.debug, args.force)
+    if args.info:
+        cfg = load_config()
+        db = connect()
+        update_complex_info(new_session(), db, cfg.get("complexes", []), 0, cfg.get("request_delay_sec", 3), force=True)
+        db.close()
+    else:
+        run(args.dry_run, args.debug, args.force)
