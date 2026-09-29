@@ -153,10 +153,15 @@ header p { margin: 0; color: var(--text-muted); font-size: 13px; }
 .toolbar button { flex: 1; min-height: 36px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 14px; }
 .toolbar button[aria-pressed="true"] { border-color: var(--text-primary); color: var(--text-primary); font-weight: 600; }
-.summary { width: 100%; border-collapse: collapse; background: var(--surface-1); border: 1px solid var(--border);
-  border-radius: 12px; overflow: hidden; font-size: 14px; font-variant-numeric: tabular-nums; }
+.table-wrap { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.summary { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 .summary th, .summary td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
-.summary th:first-child, .summary td:first-child { text-align: left; white-space: normal; }
+/* 좌우로 밀어도 단지명은 왼쪽에 고정 */
+.summary th:first-child, .summary td:first-child { text-align: left; position: sticky; left: 0; z-index: 1;
+  background: var(--surface-1); box-shadow: 1px 0 0 var(--border); }
+.summary td small { color: var(--text-muted); font-size: 11px; }
+.summary .gap { border-left: 1px solid var(--border); }
 .summary th { color: var(--text-muted); font-weight: 500; font-size: 12px; }
 .summary tr:last-child td { border-bottom: 0; }
 .summary a { color: inherit; text-decoration: none; }
@@ -204,7 +209,7 @@ details th { color: var(--text-muted); font-weight: 500; }
       <button data-months="0">전체</button>
     </div>
   </div>
-  <table class="summary" id="summary"></table>
+  <div class="table-wrap"><table class="summary" id="summary"></table></div>
   <div id="cards"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
@@ -244,31 +249,46 @@ function view(c) {
   return {asking, trades};
 }
 
+// 사용승인일·세대수·용적률·건폐율을 표시용 문자열로. 연차는 올해 − 사용승인 연도(네이버 approvalElapsedYear 와 같음).
+function infoText(info) {
+  info = info || {};
+  const ap = info.approval;
+  const age = ap ? new Date().getFullYear() - Number(ap.slice(0, 4)) : null;
+  return {
+    approval: ap ? ap.slice(0, 7).replace("-", ".") : "-",
+    age: age != null ? age + "년" : "",
+    households: info.households == null ? "-" : info.households.toLocaleString(),
+    far: info.far == null ? "-" : info.far + "%",
+    bcr: info.bcr == null ? "-" : info.bcr + "%",
+  };
+}
+
 function renderSummary() {
   const rows = DATA.complexes.map((c, i) => {
+    const f = infoText(c.info);
+    const info = `<td>${f.approval}${f.age ? ` <small>${f.age}</small>` : ""}</td>
+      <td>${f.households}</td><td>${f.far}</td><td>${f.bcr}</td>`;
     const v = view(c);
-    if (!v) return `<tr><td>${esc(c.name)}</td><td colspan="3" style="color:var(--text-muted)">${
+    if (!v) return `<tr><td>${esc(c.name)}</td>${info}<td class="gap" colspan="3" style="color:var(--text-muted)">${
       Object.keys(c.types).length ? "해당 타입 없음" : "수집 전"}</td></tr>`;
     const a = last(v.asking), t = last(v.trades);
-    return `<tr><td><a href="#c${i}">${esc(c.name)}</a></td>
-      <td>${a ? a[1] + "건" : "-"}</td><td>${a ? won(a[2]) : "-"}</td>
+    return `<tr><td><a href="#c${i}">${esc(c.name)}</a></td>${info}
+      <td class="gap">${a ? a[1] + "건" : "-"}</td><td>${a ? won(a[2]) : "-"}</td>
       <td>${t ? won(t[1]) : "-"}</td></tr>`;
   }).join("");
   document.getElementById("summary").innerHTML =
-    `<thead><tr><th>단지</th><th>매물</th><th>최저 호가</th><th>최근 실거래</th></tr></thead><tbody>${rows}</tbody>`;
+    `<thead><tr><th>단지</th><th>사용승인</th><th>세대수</th><th>용적률</th><th>건폐율</th>
+      <th class="gap">매물</th><th>최저 호가</th><th>최근 실거래</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
-// 사용승인일·세대수·용적률·건폐율. 연차는 올해 − 사용승인 연도(네이버 approvalElapsedYear 와 같음).
 function infoRow(info) {
   if (!info || !Object.keys(info).length) return "";
-  const n = v => v == null ? "-" : v.toLocaleString();
-  const ap = info.approval;
-  const age = ap ? new Date().getFullYear() - Number(ap.slice(0, 4)) : null;
+  const f = infoText(info);
   return `<dl class="info">
-    <div><dt>사용승인</dt><dd>${ap ? ap.slice(0, 7).replace("-", ".") : "-"}${age != null ? ` <small>${age}년</small>` : ""}</dd></div>
-    <div><dt>세대수</dt><dd>${n(info.households)}</dd></div>
-    <div><dt>용적률</dt><dd>${info.far == null ? "-" : info.far + "%"}</dd></div>
-    <div><dt>건폐율</dt><dd>${info.bcr == null ? "-" : info.bcr + "%"}</dd></div>
+    <div><dt>사용승인</dt><dd>${f.approval}${f.age ? ` <small>${f.age}</small>` : ""}</dd></div>
+    <div><dt>세대수</dt><dd>${f.households}</dd></div>
+    <div><dt>용적률</dt><dd>${f.far}</dd></div>
+    <div><dt>건폐율</dt><dd>${f.bcr}</dd></div>
   </dl>`;
 }
 
