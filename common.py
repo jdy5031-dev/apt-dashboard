@@ -12,6 +12,10 @@ SECRETS_PATH = BASE_DIR / "secrets.json"
 DB_PATH = BASE_DIR / "data" / "apt.db"
 LOG_PATH = BASE_DIR / "logs" / "run.log"
 DOCS_DIR = BASE_DIR / "docs"
+# 맥(호가)과 GitHub Actions(실거래)가 git 으로 주고받는 데이터. 파일마다 쓰는 쪽은 한 곳뿐이라 충돌이 나지 않는다.
+STATE_DIR = BASE_DIR / "state"
+ASKING_STATE = STATE_DIR / "asking.json"    # 맥이 씀: 단지별 호가 요약 + 단지 정보
+TRADES_STATE = STATE_DIR / "trades.json"    # GitHub Actions 가 씀: 실거래 + 조회 기록
 
 SCHEMA = """
 -- 네이버 매물 조회 1회분. 평형 필터는 대시보드 생성 시 적용하므로 여기엔 전체 매물을 저장한다.
@@ -93,6 +97,13 @@ def load_secrets() -> dict:
     if not SECRETS_PATH.exists():
         return {}
     with open(SECRETS_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_state(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 

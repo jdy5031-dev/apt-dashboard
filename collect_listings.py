@@ -48,9 +48,16 @@ def new_session() -> requests.Session:
 
 
 def post(session, path: str, body: dict) -> dict:
-    """429 이면 잠깐 쉬었다가 두 번까지 다시 시도한다."""
+    """429 이거나 연결이 끊기면 잠깐 쉬었다가 두 번까지 다시 시도한다."""
     for attempt in range(3):
-        resp = session.post(API + path, json=body, timeout=15)
+        try:
+            resp = session.post(API + path, json=body, timeout=15)
+        except requests.ConnectionError as e:
+            if attempt == 2:
+                raise
+            log.warning("연결 끊김, 20초 후 재시도: %s", type(e).__name__)
+            time.sleep(20)
+            continue
         if resp.status_code == 429 and attempt < 2:
             wait = 30 * (attempt + 1)
             log.warning("429 요청 과다, %d초 후 재시도", wait)
@@ -75,11 +82,12 @@ def update_complex_info(session, conn, complexes: list, refresh_days: int, delay
         last = fetched.get(name)
         if last and not force and (now - datetime.strptime(last, "%Y-%m-%d %H:%M:%S")).days < refresh_days:
             continue
-        resp = session.get(API + "/complex", params={"complexNumber": complex_no}, timeout=15)
         try:
+            resp = session.get(API + "/complex", params={"complexNumber": complex_no}, timeout=15)
             data = resp.json()
-        except ValueError:
-            data = {}
+        except (requests.RequestException, ValueError) as e:
+            log.error("단지 정보 조회 실패: %s (%s)", name, type(e).__name__)
+            continue
         if resp.status_code != 200 or not data.get("isSuccess"):
             log.error("단지 정보 조회 실패: %s (HTTP %d)", name, resp.status_code)
             continue

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-data/apt.db 를 읽어서 휴대폰용 정적 대시보드 docs/index.html 을 만든다.
+state/asking.json(호가, 맥이 만듦)과 state/trades.json(실거래, GitHub Actions 가 만듦)을 읽어서
+휴대폰용 정적 대시보드 docs/index.html 을 만든다. 보통 GitHub Actions 에서 실행된다.
+export_asking() 은 맥의 data/apt.db 에서 호가 요약을 state/asking.json 으로 내보낸다.
 
 - 호가: 하루에 여러 번 수집했으면 그날 마지막 스냅샷만 쓴다. 평형(전용 ㎡) 필터를 적용하고
   전용면적 타입(59, 84 …)별로 나눈다. 중복 매물은 네이버가 이미 묶어 준다.
@@ -11,9 +13,9 @@ data/apt.db 를 읽어서 휴대폰용 정적 대시보드 docs/index.html 을 �
 import json
 import statistics
 from collections import defaultdict
-from datetime import datetime
 
-from common import DOCS_DIR, area_range, connect, format_price, load_config, setup_logging
+from common import (ASKING_STATE, DOCS_DIR, TRADES_STATE, area_range, connect, format_price, load_config,
+                    load_state, setup_logging)
 
 log = setup_logging("dashboard")
 
@@ -52,15 +54,11 @@ def asking_series(conn, name: str, lo: float, hi: float) -> dict:
     return out
 
 
-def trade_series(conn, name: str, lo: float, hi: float) -> dict:
-    """{타입: [[계약일, 금액, 층, 전용㎡], ...]}"""
-    rows = conn.execute(
-        """SELECT deal_date, price, floor, excl_area FROM trade
-           WHERE complex = ? AND cancelled = 0 AND excl_area BETWEEN ? AND ?
-           ORDER BY deal_date""",
-        (name, lo, hi),
-    ).fetchall()
+def trade_series(trades: list, name: str, lo: float, hi: float) -> dict:
+    """{타입: [[계약일, 금액, 층, 전용㎡], ...]}  trades 는 state/trades.json 의 행(dict)."""
     out = defaultdict(list)
+    rows = sorted((t for t in trades if t["complex"] == name and not t["cancelled"] and lo <= t["excl_area"] <= hi),
+                  key=lambda t: t["deal_date"])
     for r in rows:
         out[area_type(r["excl_area"])].append([r["deal_date"], r["price"], r["floor"], r["excl_area"]])
     return out
@@ -78,20 +76,45 @@ def complex_info(conn, name: str) -> dict:
             "far": r["floor_area_ratio"] or None, "bcr": r["building_cov_ratio"] or None}
 
 
-def build() -> str:
+def export_asking() -> bool:
+    """data/apt.db → state/asking.json. 내용이 바뀌었으면 True."""
     config = load_config()
     conn = connect()
+    last = conn.execute("SELECT MAX(collected_at) FROM listing_snapshot").fetchone()[0]
+    complexes = {}
+    for c in config.get("complexes", []):
+        lo, hi = area_range(config, c)
+        complexes[c["name"]] = {"info": complex_info(conn, c["name"]), "asking": asking_series(conn, c["name"], lo, hi)}
+    conn.close()
+    text = json.dumps({"collected_at": last, "complexes": complexes}, ensure_ascii=False, indent=1) + "\n"
+    if ASKING_STATE.exists() and ASKING_STATE.read_text(encoding="utf-8") == text:
+        return False
+    ASKING_STATE.parent.mkdir(parents=True, exist_ok=True)
+    ASKING_STATE.write_text(text, encoding="utf-8")
+    log.info("호가 요약 저장: %s (수집 %s)", ASKING_STATE, last)
+    return True
+
+
+def build() -> str:
+    config = load_config()
+    asking_state = load_state(ASKING_STATE)
+    trades_state = load_state(TRADES_STATE)
+    cols = trades_state.get("columns", [])
+    trades = [dict(zip(cols, r)) for r in trades_state.get("trades", [])]
     complexes = []
     for c in config.get("complexes", []):
         lo, hi = area_range(config, c)
-        asking = asking_series(conn, c["name"], lo, hi)
-        trades = trade_series(conn, c["name"], lo, hi)
-        types = {t: {"asking": asking.get(t, []), "trades": trades.get(t, [])}
-                 for t in sorted(set(asking) | set(trades), key=int)}
-        complexes.append({"name": c["name"], "info": complex_info(conn, c["name"]), "types": types})
-    conn.close()
+        a = asking_state.get("complexes", {}).get(c["name"], {})
+        asking = a.get("asking", {})
+        trade = trade_series(trades, c["name"], lo, hi)
+        types = {t: {"asking": asking.get(t, []), "trades": trade.get(t, [])}
+                 for t in sorted(set(asking) | set(trade), key=int)}
+        complexes.append({"name": c["name"], "info": a.get("info", {}), "types": types})
 
-    updated = datetime.now().strftime("%Y-%m-%d %H:%M")
+    # 실행 시각이 아니라 데이터 기준 시각을 적어서, 데이터가 그대로면 index.html 도 그대로 둔다
+    asked = (asking_state.get("collected_at") or "")[:16] or "-"
+    traded = max((r[2] for r in trades_state.get("fetch_log", [])), default="")[:16] or "-"
+    updated = f"호가 {asked} · 실거래 {traded}"
     payload = json.dumps({"updated": updated, "complexes": complexes}, ensure_ascii=False)
     html = TEMPLATE.replace("__DATA__", payload.replace("</", "<\\/")).replace("__UPDATED__", updated)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
@@ -198,7 +221,7 @@ details th { color: var(--text-muted); font-weight: 500; }
 <main>
   <header>
     <h1>아파트 시세 추이</h1>
-    <p>호가: 네이버 부동산 매매 매물 · 실거래: 국토교통부 · 업데이트 __UPDATED__</p>
+    <p>호가: 네이버 부동산 매매 매물 · 실거래: 국토교통부 · __UPDATED__ 기준</p>
   </header>
   <div class="controls">
     <div class="toolbar" id="types" role="group" aria-label="전용면적 타입"></div>
@@ -407,4 +430,10 @@ render();
 
 
 if __name__ == "__main__":
+    import argparse
+    p = argparse.ArgumentParser(description="대시보드 생성")
+    p.add_argument("--export-asking", action="store_true", help="먼저 data/apt.db 의 호가를 state/asking.json 으로 내보내기(맥)")
+    args = p.parse_args()
+    if args.export_asking:
+        export_asking()
     build()

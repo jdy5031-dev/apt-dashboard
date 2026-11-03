@@ -4,11 +4,13 @@
 국토교통부 아파트 매매 실거래가(상세) 수집기.
 
 공공데이터포털 "국토교통부_아파트 매매 실거래가 상세 자료" API를 시군구(LAWD_CD) × 계약월 단위로 호출해서
-config.json 의 단지와 이름이 맞는 거래만 data/apt.db 의 trade 테이블에 저장한다.
+config.json 의 단지와 이름이 맞는 거래만 trade 테이블에 저장한다.
+실행할 때마다 state/trades.json 을 DB로 불러온 뒤 수집하고, 끝나면 다시 state/trades.json 으로 내보낸다
+(GitHub Actions 는 매번 빈 환경에서 시작하므로 이 파일이 이력 역할을 한다).
 
 - 처음 실행하면 trade_backfill_months 개월치를 받아 온다.
 - 이후에는 최근 trade_refresh_months 개월만 다시 받는다(신고 기한 30일, 해제 신고 반영).
-- 인증키는 secrets.json 의 molit_service_key 에 넣는다(secrets.json.example 참고).
+- 인증키는 환경 변수 MOLIT_SERVICE_KEY(GitHub Actions Secrets) 또는 secrets.json 의 molit_service_key.
 
 단지 이름 확인용:
     python collect_trades.py --find 11230 이문
@@ -16,6 +18,8 @@ config.json 의 단지와 이름이 맞는 거래만 data/apt.db 의 trade 테�
 """
 
 import argparse
+import json
+import os
 import sys
 import time
 import xml.etree.ElementTree as ET
@@ -25,7 +29,7 @@ from urllib.parse import unquote
 
 import requests
 
-from common import connect, load_config, load_secrets, setup_logging
+from common import TRADES_STATE, connect, load_config, load_secrets, load_state, setup_logging
 
 log = setup_logging("trades")
 
@@ -38,9 +42,9 @@ class ApiError(Exception):
 
 
 def service_key() -> str:
-    key = load_secrets().get("molit_service_key", "").strip()
+    key = (os.environ.get("MOLIT_SERVICE_KEY") or load_secrets().get("molit_service_key", "")).strip()
     if not key or "여기에" in key:
-        raise ApiError("secrets.json 에 molit_service_key 가 없습니다. secrets.json.example 을 참고하세요.")
+        raise ApiError("인증키가 없습니다. 환경 변수 MOLIT_SERVICE_KEY 또는 secrets.json 의 molit_service_key 를 설정하세요.")
     # 포털의 '인코딩' 키를 넣어도 requests 가 한 번 더 인코딩하지 않도록 디코딩 키로 맞춘다.
     return unquote(key) if "%" in key else key
 
@@ -122,6 +126,34 @@ def matches(it: dict, c: dict) -> bool:
     return not c.get("umd_nm") or it.get("umdNm") == c["umd_nm"]
 
 
+TRADE_COLS = ("complex", "deal_date", "price", "excl_area", "floor", "apt_dong",
+              "cancelled", "cancel_date", "dealing_type", "updated_at")
+
+
+def import_state(conn):
+    """state/trades.json → trade, trade_fetch_log (DB 내용을 파일 내용으로 바꾼다)."""
+    state = load_state(TRADES_STATE)
+    if not state:
+        return
+    conn.execute("DELETE FROM trade")
+    conn.execute("DELETE FROM trade_fetch_log")
+    conn.executemany(f"INSERT INTO trade ({', '.join(TRADE_COLS)}) VALUES ({', '.join('?' * len(TRADE_COLS))})",
+                     state.get("trades", []))
+    conn.executemany("INSERT INTO trade_fetch_log VALUES (?, ?, ?)", state.get("fetch_log", []))
+    conn.commit()
+
+
+def export_state(conn):
+    """trade, trade_fetch_log → state/trades.json. git diff 가 작게 나오도록 한 줄에 한 건씩 쓴다."""
+    trades = conn.execute(f"SELECT {', '.join(TRADE_COLS)} FROM trade ORDER BY complex, deal_date, excl_area, floor, apt_dong, price")
+    log_rows = conn.execute("SELECT lawd_cd, deal_ymd, fetched_at FROM trade_fetch_log ORDER BY lawd_cd, deal_ymd")
+    dump = lambda rows: ",\n".join(json.dumps(list(r), ensure_ascii=False) for r in rows)
+    TRADES_STATE.parent.mkdir(parents=True, exist_ok=True)
+    TRADES_STATE.write_text(
+        f'{{"columns": {json.dumps(TRADE_COLS)},\n"fetch_log": [\n{dump(log_rows)}\n],\n"trades": [\n{dump(trades)}\n]}}\n',
+        encoding="utf-8")
+
+
 def run(force: bool = False) -> int:
     """저장(갱신)한 거래 건수를 돌려준다."""
     config = load_config()
@@ -134,6 +166,7 @@ def run(force: bool = False) -> int:
             log.warning("건너뜀 (lawd_cd 미설정): %s", c.get("name"))
 
     conn = connect()
+    import_state(conn)
     now_dt = datetime.now()
     now = now_dt.strftime("%Y-%m-%d %H:%M:%S")
     last = conn.execute("SELECT MAX(fetched_at) FROM trade_fetch_log").fetchone()[0]
@@ -146,33 +179,36 @@ def run(force: bool = False) -> int:
     recent = set(month_list(refresh))
     saved = 0
 
-    for lawd_cd in sorted({c["lawd_cd"] for c in complexes}):
-        targets = [c for c in complexes if c["lawd_cd"] == lawd_cd]
-        for ymd in month_list(backfill):
-            if ymd not in recent and (lawd_cd, ymd) in fetched_before:
-                continue
-            items = fetch_month(key, lawd_cd, ymd)
-            rows = []
-            for it in items:
-                for c in targets:
-                    if matches(it, c):
-                        rows.append(dict(to_record(it), complex=c["name"], updated_at=now))
-            conn.executemany(
-                """INSERT INTO trade (complex, deal_date, price, excl_area, floor, apt_dong,
-                                      cancelled, cancel_date, dealing_type, updated_at)
-                   VALUES (:complex, :deal_date, :price, :excl_area, :floor, :apt_dong,
-                           :cancelled, :cancel_date, :dealing_type, :updated_at)
-                   ON CONFLICT (complex, deal_date, excl_area, floor, apt_dong, price) DO UPDATE SET cancelled = excluded.cancelled,
-                       cancel_date = excluded.cancel_date, updated_at = excluded.updated_at""",
-                rows,
-            )
-            conn.execute("INSERT OR REPLACE INTO trade_fetch_log VALUES (?, ?, ?)", (lawd_cd, ymd, now))
-            conn.commit()
-            saved += len(rows)
-            log.info("실거래 %s/%s: 전체 %d건 중 대상 단지 %d건", lawd_cd, ymd, len(items), len(rows))
-            time.sleep(0.3)
-
-    conn.close()
+    # 중간에 API 오류가 나도 그때까지 받은 달은 파일에 남긴다
+    try:
+        for lawd_cd in sorted({c["lawd_cd"] for c in complexes}):
+            targets = [c for c in complexes if c["lawd_cd"] == lawd_cd]
+            for ymd in month_list(backfill):
+                if ymd not in recent and (lawd_cd, ymd) in fetched_before:
+                    continue
+                items = fetch_month(key, lawd_cd, ymd)
+                rows = []
+                for it in items:
+                    for c in targets:
+                        if matches(it, c):
+                            rows.append(dict(to_record(it), complex=c["name"], updated_at=now))
+                conn.executemany(
+                    """INSERT INTO trade (complex, deal_date, price, excl_area, floor, apt_dong,
+                                          cancelled, cancel_date, dealing_type, updated_at)
+                       VALUES (:complex, :deal_date, :price, :excl_area, :floor, :apt_dong,
+                               :cancelled, :cancel_date, :dealing_type, :updated_at)
+                       ON CONFLICT (complex, deal_date, excl_area, floor, apt_dong, price) DO UPDATE SET cancelled = excluded.cancelled,
+                           cancel_date = excluded.cancel_date, updated_at = excluded.updated_at""",
+                    rows,
+                )
+                conn.execute("INSERT OR REPLACE INTO trade_fetch_log VALUES (?, ?, ?)", (lawd_cd, ymd, now))
+                conn.commit()
+                saved += len(rows)
+                log.info("실거래 %s/%s: 전체 %d건 중 대상 단지 %d건", lawd_cd, ymd, len(items), len(rows))
+                time.sleep(0.3)
+    finally:
+        export_state(conn)
+        conn.close()
     return saved
 
 
