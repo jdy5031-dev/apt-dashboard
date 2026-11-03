@@ -1,0 +1,36 @@
+# GitHub 서버에서 네이버·국토부 API 접속이 되는지 확인하는 일회성 테스트
+name: probe
+on:
+  push:
+    paths: [".github/workflows/probe.yml"]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -r requirements.txt
+      - name: naver
+        run: |
+          python - <<'PY'
+          import collect_listings as cl
+          s = cl.new_session()
+          try:
+              items = cl.fetch_articles(s, "8199", "A1", 1, 1, False)
+              print(f"::notice title=naver::OK 매물 {len(items)}건")
+          except Exception as e:
+              print(f"::error title=naver::{type(e).__name__}: {str(e)[:300]}")
+          PY
+      - name: molit
+        run: |
+          python - <<'PY'
+          import requests
+          try:
+              r = requests.get("https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev",
+                               params={"serviceKey": "x", "LAWD_CD": "11230", "DEAL_YMD": "202610"}, timeout=20)
+              print(f"::notice title=molit::HTTP {r.status_code} {r.text[:200]!r}")
+          except Exception as e:
+              print(f"::error title=molit::{type(e).__name__}: {e}")
+          PY
