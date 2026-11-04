@@ -21,6 +21,13 @@
     { "name": "힐스테이트청계", "complex_no": "110935", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-2823", "umd_nm": "답십리동" },
     { "name": "래미안위브", "complex_no": "104202", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-2587", "umd_nm": "답십리동" },
     { "name": "래미안크레시티", "complex_no": "103797", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-2578", "umd_nm": "전농동" },
-    { "name": "전농SK", "complex_no": "3276", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-10", "umd_nm": "전농동" }
+    { "name": "전농SK", "complex_no": "3276", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-10", "umd_nm": "전농동" },
+    { "name": "이문푸르지오2차", "complex_no": "22691", "lawd_cd": "11230", "molit_name": "이문2차푸르지오", "molit_apt_seq": "11230-2077", "umd_nm": "이문동" },
+    { "name": "이문현대", "complex_no": "1125", "lawd_cd": "11230", "molit_name": "현대", "molit_apt_seq": "11230-63", "umd_nm": "이문동" },
+    { "name": "이문쌍용", "complex_no": "3275", "lawd_cd": "11230", "molit_name": "쌍용", "molit_apt_seq": "11230-62", "umd_nm": "이문동" },
+    { "name": "이문아이파크자이", "complex_no": "174562", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-4370", "umd_nm": "이문동" },
+    { "name": "중앙하이츠빌", "complex_no": "9538", "lawd_cd": "11230", "molit_name": "", "molit_apt_seq": "11230-76", "umd_nm": "이문동" },
+    { "name": "이문삼익", "complex_no": "1124", "lawd_cd": "11230", "molit_name": "삼익", "molit_apt_seq": "11230-61", "umd_nm": "이문동" },
+    { "name": "래미안이문2차", "complex_no": "8791", "lawd_cd": "11230", "molit_name": "래미안이문2차", "molit_apt_seq": "11230-125", "umd_nm": "이문동" }
   ]
 }

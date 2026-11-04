@@ -130,27 +130,29 @@ TRADE_COLS = ("complex", "deal_date", "price", "excl_area", "floor", "apt_dong",
               "cancelled", "cancel_date", "dealing_type", "updated_at")
 
 
-def import_state(conn):
-    """state/trades.json → trade, trade_fetch_log (DB 내용을 파일 내용으로 바꾼다)."""
+def import_state(conn) -> set:
+    """state/trades.json → trade, trade_fetch_log (DB 내용을 파일 내용으로 바꾼다).
+    과거 달까지 다 받아 둔 단지 이름 집합을 돌려준다."""
     state = load_state(TRADES_STATE)
     if not state:
-        return
+        return set()
     conn.execute("DELETE FROM trade")
     conn.execute("DELETE FROM trade_fetch_log")
     conn.executemany(f"INSERT INTO trade ({', '.join(TRADE_COLS)}) VALUES ({', '.join('?' * len(TRADE_COLS))})",
                      state.get("trades", []))
     conn.executemany("INSERT INTO trade_fetch_log VALUES (?, ?, ?)", state.get("fetch_log", []))
     conn.commit()
+    return set(state.get("covered", []))
 
 
-def export_state(conn):
+def export_state(conn, covered: set):
     """trade, trade_fetch_log → state/trades.json. git diff 가 작게 나오도록 한 줄에 한 건씩 쓴다."""
     trades = conn.execute(f"SELECT {', '.join(TRADE_COLS)} FROM trade ORDER BY complex, deal_date, excl_area, floor, apt_dong, price")
     log_rows = conn.execute("SELECT lawd_cd, deal_ymd, fetched_at FROM trade_fetch_log ORDER BY lawd_cd, deal_ymd")
     dump = lambda rows: ",\n".join(json.dumps(list(r), ensure_ascii=False) for r in rows)
     TRADES_STATE.parent.mkdir(parents=True, exist_ok=True)
     TRADES_STATE.write_text(
-        f'{{"columns": {json.dumps(TRADE_COLS)},\n"fetch_log": [\n{dump(log_rows)}\n],\n"trades": [\n{dump(trades)}\n]}}\n',
+        f'{{"columns": {json.dumps(TRADE_COLS)},\n"covered": {json.dumps(sorted(covered), ensure_ascii=False)},\n"fetch_log": [\n{dump(log_rows)}\n],\n"trades": [\n{dump(trades)}\n]}}\n',
         encoding="utf-8")
 
 
@@ -166,12 +168,14 @@ def run(force: bool = False) -> int:
             log.warning("건너뜀 (lawd_cd 미설정): %s", c.get("name"))
 
     conn = connect()
-    import_state(conn)
+    covered = import_state(conn)
     now_dt = datetime.now()
     now = now_dt.strftime("%Y-%m-%d %H:%M:%S")
     last = conn.execute("SELECT MAX(fetched_at) FROM trade_fetch_log").fetchone()[0]
     min_hours = config.get("min_interval_hours", 6)
-    if last and not force and (now_dt - datetime.strptime(last, "%Y-%m-%d %H:%M:%S")).total_seconds() < min_hours * 3600:
+    # config 에 새로 추가된 단지가 있으면 그 시군구는 과거 달까지 다시 받는다
+    new_lawd = {c["lawd_cd"] for c in complexes if c["name"] not in covered}
+    if last and not force and not new_lawd and (now_dt - datetime.strptime(last, "%Y-%m-%d %H:%M:%S")).total_seconds() < min_hours * 3600:
         log.info("실거래 수집 건너뜀: 마지막 수집 %s (%d시간 이내)", last, min_hours)
         conn.close()
         return 0
@@ -183,8 +187,11 @@ def run(force: bool = False) -> int:
     try:
         for lawd_cd in sorted({c["lawd_cd"] for c in complexes}):
             targets = [c for c in complexes if c["lawd_cd"] == lawd_cd]
+            if lawd_cd in new_lawd:
+                log.info("새 단지 %s: %s 과거 %d개월 다시 받기", ", ".join(c["name"] for c in targets if c["name"] not in covered),
+                         lawd_cd, backfill)
             for ymd in month_list(backfill):
-                if ymd not in recent and (lawd_cd, ymd) in fetched_before:
+                if ymd not in recent and (lawd_cd, ymd) in fetched_before and lawd_cd not in new_lawd:
                     continue
                 items = fetch_month(key, lawd_cd, ymd)
                 rows = []
@@ -206,8 +213,9 @@ def run(force: bool = False) -> int:
                 saved += len(rows)
                 log.info("실거래 %s/%s: 전체 %d건 중 대상 단지 %d건", lawd_cd, ymd, len(items), len(rows))
                 time.sleep(0.3)
+            covered |= {c["name"] for c in targets}
     finally:
-        export_state(conn)
+        export_state(conn, covered)
         conn.close()
     return saved
 
