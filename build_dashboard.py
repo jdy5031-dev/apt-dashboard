@@ -185,7 +185,12 @@ header p { margin: 0; color: var(--text-muted); font-size: 13px; }
   background: var(--surface-1); box-shadow: 1px 0 0 var(--border); }
 .summary td small { color: var(--text-muted); font-size: 11px; }
 .summary .gap { border-left: 1px solid var(--border); }
-.summary th { color: var(--text-muted); font-weight: 500; font-size: 12px; }
+.summary th { color: var(--text-muted); font-weight: 500; font-size: 12px; padding: 0; }
+.summary th button { all: unset; display: block; box-sizing: border-box; width: 100%; padding: 8px 10px; cursor: pointer;
+  text-align: inherit; -webkit-tap-highlight-color: transparent; }
+.summary th button:focus-visible { outline: 2px solid var(--text-secondary); outline-offset: -2px; }
+.summary th[aria-sort] { color: var(--text-primary); font-weight: 600; }
+.summary th .arrow { display: inline-block; width: 1em; text-align: center; }
 .summary tr:last-child td { border-bottom: 0; }
 .summary a { color: inherit; text-decoration: none; }
 .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 10px; margin-top: 14px; }
@@ -286,8 +291,40 @@ function infoText(info) {
   };
 }
 
+// 표 정렬: 같은 열을 다시 누르면 오름차순 ↔ 내림차순. 값이 없는 행은 방향과 관계없이 맨 아래.
+const COLUMNS = [
+  {key: "name", label: "단지"}, {key: "approval", label: "사용승인"}, {key: "households", label: "세대수"},
+  {key: "far", label: "용적률"}, {key: "bcr", label: "건폐율"},
+  {key: "count", label: "매물", gap: true}, {key: "minAsk", label: "최저 호가"}, {key: "lastTrade", label: "최근 실거래"},
+];
+function sortValue(c, key) {
+  const info = c.info || {}, v = view(c);
+  const a = v && last(v.asking), t = v && last(v.trades);
+  switch (key) {
+    case "name": return c.name;
+    case "approval": return info.approval || null;
+    case "households": case "far": case "bcr": return info[key] ?? null;
+    case "count": return a ? a[1] : null;
+    case "minAsk": return a ? a[2] : null;
+    case "lastTrade": return t ? t[1] : null;
+  }
+}
+
 function renderSummary() {
-  const rows = DATA.complexes.map((c, i) => {
+  const order = DATA.complexes.map((c, i) => i);
+  const sort = state.sort;
+  if (sort && COLUMNS.some(col => col.key === sort.key)) {
+    const dir = sort.dir === "desc" ? -1 : 1;
+    const vals = DATA.complexes.map(c => sortValue(c, sort.key));
+    order.sort((i, j) => {
+      const x = vals[i], y = vals[j];
+      if (x == null || y == null) return (x == null) - (y == null) || i - j;
+      const d = typeof x === "string" ? x.localeCompare(y, "ko") : x - y;
+      return d * dir || i - j;
+    });
+  }
+  const rows = order.map(i => {
+    const c = DATA.complexes[i];
     const f = infoText(c.info);
     const info = `<td>${f.approval}${f.age ? ` <small>${f.age}</small>` : ""}</td>
       <td>${f.households}</td><td>${f.far}</td><td>${f.bcr}</td>`;
@@ -299,9 +336,13 @@ function renderSummary() {
       <td class="gap">${a ? a[1] + "건" : "-"}</td><td>${a ? won(a[2]) : "-"}</td>
       <td>${t ? won(t[1]) : "-"}</td></tr>`;
   }).join("");
-  document.getElementById("summary").innerHTML =
-    `<thead><tr><th>단지</th><th>사용승인</th><th>세대수</th><th>용적률</th><th>건폐율</th>
-      <th class="gap">매물</th><th>최저 호가</th><th>최근 실거래</th></tr></thead><tbody>${rows}</tbody>`;
+  const head = COLUMNS.map(col => {
+    const on = sort && sort.key === col.key;
+    const aria = on ? ` aria-sort="${sort.dir === "desc" ? "descending" : "ascending"}"` : "";
+    return `<th${col.gap ? ' class="gap"' : ""}${aria}><button type="button" data-sort="${col.key}">${col.label}<span class="arrow">${
+      on ? (sort.dir === "desc" ? "▼" : "▲") : ""}</span></button></th>`;
+  }).join("");
+  document.getElementById("summary").innerHTML = `<thead><tr>${head}</tr></thead><tbody>${rows}</tbody>`;
 }
 
 function infoRow(info) {
@@ -417,6 +458,13 @@ function render() {
 }
 document.getElementById("types").addEventListener("click", e => {
   const b = e.target.closest("button"); if (b) { state.group = Number(b.dataset.group); render(); }
+});
+document.getElementById("summary").addEventListener("click", e => {
+  const b = e.target.closest("button[data-sort]"); if (!b) return;
+  const key = b.dataset.sort, cur = state.sort;
+  state.sort = {key, dir: cur && cur.key === key && cur.dir === "asc" ? "desc" : "asc"};
+  try { localStorage.setItem("apt-view", JSON.stringify(state)); } catch (e) {}
+  renderSummary();
 });
 document.getElementById("periods").addEventListener("click", e => {
   const b = e.target.closest("button"); if (b) { state.months = Number(b.dataset.months); render(); }
