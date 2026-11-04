@@ -5,7 +5,8 @@ on:
     - cron: "0 22 * * *"   # 매일 07:00 KST (GitHub 사정으로 늦게 시작될 수 있음)
   push:
     branches: [main]
-    paths: ["state/asking.json", "config.json", "build_dashboard.py", "collect_trades.py", "common.py"]
+    paths: ["state/asking.json", "config.json", "build_dashboard.py", "collect_trades.py", "common.py",
+            ".github/workflows/update.yml"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -18,7 +19,10 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
+      # 실행을 일으킨 커밋이 아니라 main 최신 상태로 받는다(앞선 실행이 올린 대시보드와 충돌하지 않게)
       - uses: actions/checkout@v5
+        with:
+          ref: main
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
