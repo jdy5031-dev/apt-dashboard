@@ -1,18 +1,31 @@
 # 아파트 시세 대시보드
 
-관심 단지들의 **네이버 부동산 매매 호가**와 **국토부 실거래가**를 하루 1~2회 모아
-SQLite(`data/apt.db`)에 쌓고, 휴대폰으로 보는 정적 대시보드(`docs/index.html`)를 만듭니다.
+관심 단지들의 **네이버 부동산 매매 호가**와 **국토부 실거래가**를 모아
+휴대폰으로 보는 정적 대시보드(`docs/index.html`, GitHub Pages)를 만듭니다.
+
+## 구조 (맥 + GitHub Actions)
+
+네이버가 GitHub 서버 IP를 막아서 일을 나눴습니다. 두 쪽이 서로 다른 파일만 쓰므로 git 충돌이 없습니다.
+
+| 어디서 | 하는 일 | 쓰는 파일 |
+|---|---|---|
+| 맥 (`run.py`, launchd) | 네이버 호가 수집 → `data/apt.db` → 요약을 push | `state/asking.json` |
+| GitHub Actions (`.github/workflows/update.yml`, 매일 07시 + asking.json push 때) | 국토부 실거래 수집, 대시보드 생성 | `state/trades.json`, `docs/index.html` |
+
+맥이 꺼져 있어도 실거래는 매일 갱신되고, 호가는 맥이 켜졌을 때 갱신됩니다.
+GitHub Actions 는 저장소 Settings → Secrets and variables → Actions 의 `MOLIT_SERVICE_KEY` 를 인증키로 씁니다.
+config.json 에 단지를 추가하면 다음 실거래 수집 때 그 시군구의 과거 36개월을 자동으로 다시 받습니다.
 
 ## 파일
 
 | 파일 | 역할 |
 |---|---|
-| `run.py` | 전체 실행(호가 → 실거래 → 대시보드 → 게시). 스케줄러에는 이것만 등록 |
+| `run.py` | 맥에서 실행(호가 수집 → `state/asking.json` push). launchd 에는 이것만 등록 |
 | `collect_listings.py` | 네이버 매물 수집 (`--dry-run --debug`로 응답 확인) |
 | `collect_trades.py` | 국토부 실거래 수집 (`--find 시군구코드 키워드`로 단지명 찾기) |
-| `build_dashboard.py` | `docs/index.html` 생성 |
+| `build_dashboard.py` | `state/*.json` → `docs/index.html` 생성 (`--export-asking`: DB → asking.json) |
 | `config.json` | 단지 목록, 평형(전용 ㎡) 조건, 수집 설정 |
-| `secrets.json` | 실거래 API 인증키 (직접 만듦, git에 올라가지 않음) |
+| `secrets.json` | 실거래 API 인증키 — 맥에서 직접 실거래를 받을 때만 (git에 올라가지 않음) |
 
 ## 1. 설치 (macOS)
 
@@ -46,7 +59,7 @@ python3 -m venv .venv
 ```bash
 .venv/bin/python collect_listings.py --dry-run --debug   # 네이버 응답 확인 (logs/debug_*.json)
 # 직전 수집 후 6시간(min_interval_hours)이 안 지났으면 건너뜀. 강제로 하려면 --force
-.venv/bin/python run.py --no-publish                     # 전체 실행
+.venv/bin/python run.py --no-publish                     # 호가 수집 + 로컬에서 대시보드 생성(--trades: 실거래도)
 open docs/index.html
 ```
 
@@ -56,7 +69,7 @@ open docs/index.html
 
 1. GitHub에 **public** 저장소를 만들고 이 폴더를 push (`secrets.json`, `data/`, `logs/`는 `.gitignore`로 빠짐)
 2. 저장소 Settings → Pages → Branch `main`, 폴더 `/docs`
-3. `config.json`의 `"publish_git": true` → 매 실행 후 대시보드가 자동으로 push 됩니다
+3. `config.json`의 `"publish_git": true` → 맥은 호가 요약을 push 하고, GitHub Actions 가 대시보드를 만들어 커밋합니다
 
 링크를 아는 사람은 누구나 볼 수 있습니다(검색엔진 색인은 막아 둠).
 
