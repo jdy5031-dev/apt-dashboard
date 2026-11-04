@@ -47,7 +47,7 @@
   첫 요청부터 429로 막아서(두 번 다른 IP로 확인) 호가는 맥에서만 수집. 실거래(국토부)는 Actions 에서 접속됨.
   맥: 호가 → data/apt.db → `state/asking.json` 만 커밋·push. Actions(update.yml, 매일 07시 KST + asking.json·config 등 push 시):
   실거래 → `state/trades.json`, 대시보드 → docs/index.html 커밋. 파일마다 쓰는 쪽이 하나라 충돌 없음. Actions 는 `ref: main` 으로 체크아웃.
-  **Actions Secret `MOLIT_SERVICE_KEY` 는 사용자가 아직 등록 안 함** → 그 전까지 Actions 실거래 단계는 실패(대시보드 생성은 계속됨).
+  Actions Secret `MOLIT_SERVICE_KEY` 등록 완료(2026-11-04), Actions 에서 실거래 수집 성공 확인.
 - 네이버 Connection reset 이 단지 정보 조회에서 나면 호가 수집 전체가 죽던 버그 수정(재시도 + 단지별로 건너뜀).
 - 네이버 단지 검색: `GET fin.land.naver.com/front-api/v1/search/autocomplete/complexes?keyword=`.
 - 단지 7곳 추가(총 19곳): 이문푸르지오2차, 이문현대(국토부 '현대'), 이문쌍용, 이문아이파크자이(3-1BL, 174562), 중앙하이츠빌, 이문삼익, 래미안이문2차.
@@ -55,7 +55,7 @@
   trades.json 의 `covered` 에 없는 단지가 config 에 생기면 그 시군구 과거분을 자동 재수집.
 
 ## 다음 단계
-1. 사용자가 GitHub 저장소 Settings → Secrets and variables → Actions 에 `MOLIT_SERVICE_KEY` 등록 → Actions 실거래 수집 성공 확인
+1. (없음) 운영하면서 문제 생기면 대응
 
 ## 파일
 - `run.py`: 맥 실행 진입점(호가 + asking.json push) / `common.py`: 설정·DB 스키마·state 경로
